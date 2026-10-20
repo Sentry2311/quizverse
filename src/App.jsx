@@ -1,17 +1,6 @@
 import { createContext, useContext, useEffect, useMemo, useState } from 'react'
 
 const QuizContext = createContext(null)
-const quizzes = [
-  { id: 1, title: 'JavaScript Essentials', category: 'Programming', minutes: 8, questions: [
-    { text: 'Which keyword creates a block-scoped variable?', options: ['var', 'let', 'const and let', 'define'], answer: 2 },
-    { text: 'What does === compare?', options: ['Only values', 'Values and types', 'Only types', 'Object keys'], answer: 1 },
-    { text: 'Which method adds an item to an array end?', options: ['shift()', 'push()', 'pop()', 'unshift()'], answer: 1 }
-  ]},
-  { id: 2, title: 'Calculus Foundations', category: 'Mathematics', minutes: 12, questions: [] },
-  { id: 3, title: 'Solar System Explorer', category: 'Science', minutes: 10, questions: [] },
-  { id: 4, title: 'World Facts Challenge', category: 'General Knowledge', minutes: 7, questions: [] }
-]
-
 function useQuiz() {
   const value = useContext(QuizContext)
   if (!value) throw new Error('Quiz context is unavailable')
@@ -27,6 +16,15 @@ export default function App() {
   const [answers, setAnswers] = useState({})
   const [question, setQuestion] = useState(0)
   const [seconds, setSeconds] = useState(480)
+  const [quizzes, setQuizzes] = useState([])
+  const [apiError, setApiError] = useState('')
+
+  useEffect(() => {
+    fetch('/api/quizzes')
+      .then(response => { if (!response.ok) throw new Error('Quiz API is unavailable'); return response.json() })
+      .then(setQuizzes)
+      .catch(error => setApiError(error.message))
+  }, [])
 
   useEffect(() => { localStorage.setItem('quizverse-registered', JSON.stringify(registered)) }, [registered])
   useEffect(() => { localStorage.setItem('quizverse-attempts', JSON.stringify(attempts)) }, [attempts])
@@ -40,15 +38,15 @@ export default function App() {
   const activeQuiz = quizzes[0]
   const score = useMemo(() => activeQuiz.questions.reduce((total, item, index) => total + (answers[index] === item.answer ? 1 : 0), 0), [answers])
   const register = title => setRegistered(items => items.includes(title) ? items.filter(item => item !== title) : [...items, title])
-  const start = () => { setAnswers({}); setQuestion(0); setSeconds(activeQuiz.minutes * 60); setPage('quiz') }
+  const start = () => { if (!activeQuiz?.questions?.length) return; setAnswers({}); setQuestion(0); setSeconds(activeQuiz.minutes * 60); setPage('quiz') }
   const finish = () => { setAttempts(items => [{ score, total: activeQuiz.questions.length, date: new Date().toLocaleDateString() }, ...items].slice(0, 5)); setPage('results') }
-  const shared = { page, setPage, search, setSearch, category, setCategory, registered, register, attempts, answers, setAnswers, question, setQuestion, seconds, score, start, finish, activeQuiz }
+  const shared = { page, setPage, search, setSearch, category, setCategory, registered, register, attempts, answers, setAnswers, question, setQuestion, seconds, score, start, finish, activeQuiz, quizzes, apiError }
 
   return <QuizContext.Provider value={shared}>
     <div className="min-h-screen bg-slate-50 text-slate-900">
       <header className="border-b bg-white"><div className="mx-auto flex max-w-6xl items-center justify-between px-5 py-4"><button onClick={() => setPage('dashboard')} className="text-xl font-black text-indigo-700">QuizVerse</button><span className="rounded-full bg-indigo-50 px-3 py-1 text-sm font-semibold text-indigo-700">React Hooks Demo</span></div></header>
       <nav className="mx-auto flex max-w-6xl gap-2 px-5 pt-5">{[['dashboard', 'Dashboard'], ['catalog', 'Explore quizzes'], ['leaderboard', 'Leaderboard']].map(([id, label]) => <button key={id} onClick={() => setPage(id)} className={`rounded-lg px-4 py-2 text-sm font-bold ${page === id ? 'bg-indigo-600 text-white' : 'bg-white text-slate-600'}`}>{label}</button>)}</nav>
-      <main className="mx-auto max-w-6xl px-5 py-8">{page === 'dashboard' && <Dashboard/>}{page === 'catalog' && <Catalog/>}{page === 'quiz' && <Quiz/>}{page === 'results' && <Results/>}{page === 'leaderboard' && <Leaderboard/>}</main>
+      <main className="mx-auto max-w-6xl px-5 py-8">{apiError && <p role="alert" className="mb-4 rounded-xl bg-rose-50 p-4 text-rose-700">{apiError}. Start the API with <code>npm run server</code>.</p>}{page === 'dashboard' && <Dashboard/>}{page === 'catalog' && <Catalog/>}{page === 'quiz' && activeQuiz?.questions?.length ? <Quiz/> : page === 'quiz' && <p>No quiz questions are available.</p>}{page === 'results' && <Results/>}{page === 'leaderboard' && <Leaderboard/>}</main>
     </div>
   </QuizContext.Provider>
 }
@@ -60,8 +58,8 @@ function Dashboard() {
 }
 
 function Catalog() {
-  const { search, setSearch, category, setCategory, registered, register, start } = useQuiz()
-  const categories = ['All', 'Programming', 'Mathematics', 'Science', 'General Knowledge']
+  const { search, setSearch, category, setCategory, registered, register, start, quizzes } = useQuiz()
+  const categories = ['All', ...new Set(quizzes.map(item => item.category))]
   const visible = quizzes.filter(item => (category === 'All' || item.category === category) && item.title.toLowerCase().includes(search.toLowerCase()))
   return <><h1 className="text-3xl font-black">Explore quizzes</h1><p className="mt-2 text-slate-500">Search, filter, and register for a challenge.</p><input aria-label="Search quizzes" value={search} onChange={event => setSearch(event.target.value)} placeholder="Search quizzes..." className="mt-6 w-full rounded-xl border border-slate-300 bg-white px-4 py-3 outline-none focus:border-indigo-600"/><div className="mt-4 flex flex-wrap gap-2">{categories.map(item => <button key={item} onClick={() => setCategory(item)} className={`rounded-full px-4 py-2 text-sm font-bold ${category === item ? 'bg-indigo-600 text-white' : 'bg-white ring-1 ring-slate-200'}`}>{item}</button>)}</div><div className="mt-6 grid gap-4 md:grid-cols-2">{visible.map(item => { const isRegistered = registered.includes(item.title); return <article key={item.id} className="rounded-2xl bg-white p-5 shadow-sm"><span className="rounded-full bg-teal-50 px-3 py-1 text-xs font-bold text-teal-700">{item.category}</span><h2 className="mt-4 text-xl font-black">{item.title}</h2><p className="mt-2 text-slate-500">{item.questions.length || 10} questions · {item.minutes} minutes</p><div className="mt-5 flex gap-2"><button onClick={() => register(item.title)} className="flex-1 rounded-xl border border-indigo-600 py-2 font-bold text-indigo-700">{isRegistered ? 'Registered ✓' : 'Register'}</button>{item.id === 1 && <button onClick={start} className="rounded-xl bg-indigo-600 px-4 py-2 font-bold text-white">Start</button>}</div></article>})}</div>{!visible.length && <p className="mt-6 rounded-xl border border-dashed p-6 text-center text-slate-500">No quizzes match your search.</p>}</>
 }

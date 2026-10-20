@@ -36,7 +36,7 @@ export default function App() {
   useEffect(() => { if (page === 'quiz' && seconds === 0) finish() }, [seconds])
 
   const activeQuiz = quizzes[0]
-  const score = useMemo(() => activeQuiz.questions.reduce((total, item, index) => total + (answers[index] === item.answer ? 1 : 0), 0), [answers])
+  const score = useMemo(() => activeQuiz?.questions?.reduce((total, item, index) => total + (answers[index] === item.answer ? 1 : 0), 0) ?? 0, [activeQuiz, answers])
   const register = title => setRegistered(items => items.includes(title) ? items.filter(item => item !== title) : [...items, title])
   const start = () => { if (!activeQuiz?.questions?.length) return; setAnswers({}); setQuestion(0); setSeconds(activeQuiz.minutes * 60); setPage('quiz') }
   const finish = () => { setAttempts(items => [{ score, total: activeQuiz.questions.length, date: new Date().toLocaleDateString() }, ...items].slice(0, 5)); setPage('results') }
@@ -73,3 +73,4 @@ function Quiz() {
 
 function Results() { const { score, activeQuiz, start, setPage } = useQuiz(); const percent = Math.round(score / activeQuiz.questions.length * 100); return <section className="mx-auto max-w-xl rounded-3xl bg-white p-8 text-center shadow-sm"><p className="font-bold text-indigo-700">QUIZ COMPLETE</p><h1 className="mt-2 text-3xl font-black">Your score: {percent}%</h1><p className="mt-3 text-slate-600">{score} correct out of {activeQuiz.questions.length}</p><div className="mt-6 flex gap-3"><button onClick={start} className="flex-1 rounded-xl bg-indigo-600 py-3 font-bold text-white">Retry</button><button onClick={() => setPage('dashboard')} className="flex-1 rounded-xl border py-3 font-bold">Dashboard</button></div></section> }
 function Leaderboard() { return <section className="rounded-2xl bg-white p-6 shadow-sm"><h1 className="text-3xl font-black">Leaderboard</h1><p className="mt-2 text-slate-500">Weekly top learners</p>{[['Aarav', 980], ['Meera', 925], ['Alex', 870], ['Riya', 840]].map(([name, points], index) => <div key={name} className="mt-4 flex justify-between border-t pt-4"><span className="font-bold">#{index + 1} {name}</span><span className="font-black text-indigo-700">{points} pts</span></div>)}</section> }
+
